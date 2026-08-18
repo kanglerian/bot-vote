@@ -103,7 +103,10 @@ async function executeVote({
     if (chromePath) {
       launchOptions.executablePath = chromePath;
     } else {
-      launchOptions.channel = 'chrome';
+      throw new Error(
+        'Google Chrome / Chromium belum terinstall di server CT. ' +
+        'Silakan jalankan di terminal CT: apt update -y && apt install -y chromium'
+      );
     }
 
     browser = await puppeteer.launch(launchOptions);
