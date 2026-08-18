@@ -2,62 +2,59 @@ const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execSync } = require('child_process');
 puppeteer.use(StealthPlugin());
 
 /**
  * Mencari path Google Chrome / Chromium / Edge di Windows, Linux, dan Mac
  */
-function findChromePath() {
-  // 1. Cek Environment Variable kustom
-  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
-    return process.env.PUPPETEER_EXECUTABLE_PATH;
+async function findChromePath() {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    try {
+      const customPath = String(process.env.PUPPETEER_EXECUTABLE_PATH);
+      if (fs.existsSync(customPath)) {
+        return customPath;
+      }
+    } catch (e) {}
   }
-
-  // 2. Cek Puppeteer Bundled Chrome jika ada
-  try {
-    const pptr = require('puppeteer');
-    if (typeof pptr.executablePath === 'function') {
-      const p = pptr.executablePath();
-      if (p && fs.existsSync(p)) return p;
-    }
-  } catch (e) {}
 
   const isWin = process.platform === 'win32';
   const isMac = process.platform === 'darwin';
 
-  // 3. Cek lokasi spesifik Windows
+  // 1. Cek path Windows langsung
   if (isWin) {
-    const localAppData = process.env.LOCALAPPDATA || 'C:\\Users\\' + (process.env.USERNAME || '') + '\\AppData\\Local';
+    const localAppData = process.env.LOCALAPPDATA || (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'AppData', 'Local') : '');
     const programFiles = process.env.PROGRAMFILES || 'C:\\Program Files';
     const programFilesX86 = process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)';
 
     const winPaths = [
-      path.join(programFiles, 'Google\\Chrome\\Application\\chrome.exe'),
-      path.join(programFilesX86, 'Google\\Chrome\\Application\\chrome.exe'),
-      path.join(localAppData, 'Google\\Chrome\\Application\\chrome.exe'),
-      // Fallback Microsoft Edge (berbasis Chromium)
-      path.join(programFiles, 'Microsoft\\Edge\\Application\\msedge.exe'),
-      path.join(programFilesX86, 'Microsoft\\Edge\\Application\\msedge.exe'),
-      path.join(localAppData, 'Microsoft\\Edge\\Application\\msedge.exe')
-    ];
+      path.join(programFiles, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+      path.join(programFilesX86, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+      localAppData ? path.join(localAppData, 'Google', 'Chrome', 'Application', 'chrome.exe') : null,
+      path.join(programFiles, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+      path.join(programFilesX86, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+      localAppData ? path.join(localAppData, 'Microsoft', 'Edge', 'Application', 'msedge.exe') : null
+    ].filter(Boolean);
 
     for (const p of winPaths) {
-      if (fs.existsSync(p)) return p;
+      try {
+        if (typeof p === 'string' && fs.existsSync(p)) return p;
+      } catch (e) {}
     }
 
     try {
       const whereChrome = execSync('where chrome 2>nul').toString().split('\r\n')[0].trim();
-      if (whereChrome && fs.existsSync(whereChrome)) return whereChrome;
+      if (whereChrome && typeof whereChrome === 'string' && fs.existsSync(whereChrome)) return whereChrome;
     } catch (e) {}
 
     try {
       const whereEdge = execSync('where msedge 2>nul').toString().split('\r\n')[0].trim();
-      if (whereEdge && fs.existsSync(whereEdge)) return whereEdge;
+      if (whereEdge && typeof whereEdge === 'string' && fs.existsSync(whereEdge)) return whereEdge;
     } catch (e) {}
   }
 
-  // 4. Cek lokasi spesifik Mac
+  // 2. Cek path Mac langsung
   if (isMac) {
     const macPaths = [
       '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -65,11 +62,13 @@ function findChromePath() {
       '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
     ];
     for (const p of macPaths) {
-      if (fs.existsSync(p)) return p;
+      try {
+        if (typeof p === 'string' && fs.existsSync(p)) return p;
+      } catch (e) {}
     }
   }
 
-  // 5. Cek lokasi spesifik Linux
+  // 3. Cek path Linux langsung
   const linuxPaths = [
     '/usr/bin/google-chrome-stable',
     '/usr/bin/google-chrome',
@@ -79,14 +78,25 @@ function findChromePath() {
     '/usr/bin/chromium/chrome'
   ];
   for (const p of linuxPaths) {
-    if (fs.existsSync(p)) return p;
+    try {
+      if (typeof p === 'string' && fs.existsSync(p)) return p;
+    } catch (e) {}
   }
 
   try {
     const whichChrome = execSync('which google-chrome || which google-chrome-stable || which chromium || which chromium-browser 2>/dev/null')
       .toString()
       .trim();
-    if (whichChrome && fs.existsSync(whichChrome)) return whichChrome;
+    if (whichChrome && typeof whichChrome === 'string' && fs.existsSync(whichChrome)) return whichChrome;
+  } catch (e) {}
+
+  // 4. Cek Puppeteer Bundled Chrome (Async Await)
+  try {
+    const pptr = require('puppeteer');
+    if (typeof pptr.executablePath === 'function') {
+      const p = await pptr.executablePath();
+      if (p && typeof p === 'string' && fs.existsSync(p)) return p;
+    }
   } catch (e) {}
 
   return undefined;
@@ -128,9 +138,10 @@ async function executeVote({
   let browser;
   let rateLimitDetected = false;
   let retrySeconds = 10;
+  let tempProfileDir = null;
 
-  // Penentuan mode Headless yang cerdas:
-  // Di Windows / Desktop: DEFAULT FALSE (jendela browser muncul di layar!)
+  // Penentuan mode Headless:
+  // Di Windows / Mac / Desktop: DEFAULT FALSE (pasti muncul di layar!)
   // Di Linux Server tanpa DISPLAY: DEFAULT TRUE
   let runHeadless = false;
   if (typeof headless === 'boolean') {
@@ -140,43 +151,58 @@ async function executeVote({
   } else if (process.platform === 'linux' && !process.env.DISPLAY) {
     runHeadless = 'new';
   } else {
-    runHeadless = false; // Tampilkan browser di Windows / Mac / Desktop Linux
+    runHeadless = false;
   }
 
-  const chromePath = findChromePath();
-  log(`Path browser terdeteksi: ${chromePath || 'Default Puppeteer Chrome/Edge'}`);
+  const chromePath = await findChromePath();
+  if (chromePath) {
+    log(`Browser terdeteksi: ${chromePath}`);
+  } else {
+    log('Mencari browser bawaan sistem (Chrome / Edge)...');
+  }
 
+  const isWin = process.platform === 'win32';
+
+  // Buat folder profil sementara unik agar Windows TIDAK menempel ke Chrome yang sudah terbuka di background
   try {
-    const launchOptions = {
-      headless: runHeadless,
-      defaultViewport: null,
-      args: [
+    tempProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pptr_vote_'));
+  } catch (e) {}
+
+  // Argumen browser khusus untuk Windows vs Linux
+  const browserArgs = isWin
+    ? [
+        '--no-first-run',
+        '--no-default-browser-check',
+        '--start-maximized',
+        '--window-position=0,0',
+        '--window-size=1280,900'
+      ]
+    : [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--disable-blink-features=AutomationControlled',
-        '--window-size=1280,900',
-        '--start-maximized'
-      ]
-    };
+        '--disable-gpu',
+        '--window-size=1280,900'
+      ];
 
-    if (chromePath) {
-      launchOptions.executablePath = chromePath;
-    } else {
-      // Jika di Windows / Mac belum ada path khusus, coba cari channel default
-      if (process.platform === 'win32' || process.platform === 'darwin') {
-        launchOptions.channel = 'chrome';
-      }
-    }
+  const launchOptions = {
+    headless: runHeadless,
+    defaultViewport: null,
+    userDataDir: tempProfileDir || undefined,
+    args: browserArgs
+  };
 
+  if (chromePath) {
+    launchOptions.executablePath = chromePath;
+  } else if (isWin) {
+    launchOptions.channel = 'chrome';
+  }
+
+  try {
     try {
       browser = await puppeteer.launch(launchOptions);
     } catch (launchErr) {
-      // Jika launch gagal dengan channel chrome di Windows, coba fallback ke edge atau default
-      if (process.platform === 'win32') {
+      if (isWin) {
         log('Mencoba membuka Microsoft Edge...');
         delete launchOptions.executablePath;
         launchOptions.channel = 'msedge';
@@ -189,6 +215,7 @@ async function executeVote({
     const pages = await browser.pages();
     const page = pages.length > 0 ? pages[0] : await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
+
     try {
       await page.bringToFront();
     } catch (e) {}
@@ -224,7 +251,7 @@ async function executeVote({
     });
 
     const targetUrl = `https://pawainusantara.vercel.app/${carSlug}`;
-    log(`Membuka halaman target: ${targetUrl}`);
+    log(`Membuka jendela browser baru: ${targetUrl}`);
 
     await page.goto(targetUrl, {
       waitUntil: 'networkidle2',
@@ -265,7 +292,7 @@ async function executeVote({
     log('Mengisi Nomor Handphone...');
     await page.type('input[name="voter_phone"]', phone, { delay: 40 });
 
-    log('Data form terisi. Jendela browser terbuka di layar.');
+    log('Jendela browser sudah aktif di layar monitor.');
     log('💡 Silakan klik centang "Verify you are human" di layar...');
 
     // Polling status tombol dan token Turnstile
@@ -422,6 +449,12 @@ async function executeVote({
     if (browser) {
       await new Promise(r => setTimeout(r, 1000));
       await browser.close();
+    }
+    // Hapus folder temp profile setelah selesai
+    if (tempProfileDir && fs.existsSync(tempProfileDir)) {
+      try {
+        fs.rmSync(tempProfileDir, { recursive: true, force: true });
+      } catch (e) {}
     }
   }
 }
