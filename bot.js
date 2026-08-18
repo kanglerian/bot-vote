@@ -189,6 +189,9 @@ async function executeVote({
     const pages = await browser.pages();
     const page = pages.length > 0 ? pages[0] : await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
+    try {
+      await page.bringToFront();
+    } catch (e) {}
 
     // Hapus total semua cookies, cache, dan localStorage sebelum membuka halaman
     try {
