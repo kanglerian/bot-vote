@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Vote - Pawai Nusantara 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0e14;
+      --card-bg: #151922;
+      --border: #242b3b;
+      --primary: #e63946;
+      --primary-hover: #d62828;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.75rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-badge {
+      background: var(--primary);
+      color: white;
+      font-weight: 800;
+      font-size: 1.2rem;
+      padding: 6px 14px;
+      border-radius: 10px;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 12px rgba(230, 57, 70, 0.35);
+    }
+
+    .brand h1 {
+      font-size: 1.35rem;
+      font-weight: 800;
+    }
+
+    .brand p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .header-badges {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }
+
+    .queue-badge {
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent);
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+
+    /* Countdown Banner */
+    .countdown-banner {
+      display: none;
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(230, 57, 70, 0.15));
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: var(--radius);
+      padding: 1rem 1.5rem;
+      margin-bottom: 1.5rem;
+      align-items: center;
+      justify-content: space-between;
+      animation: pulseGlow 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 rgba(245, 158, 11, 0); }
+      50% { box-shadow: 0 0 15px rgba(245, 158, 11, 0.2); }
+    }
+
+    .countdown-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .timer-display {
+      font-family: monospace;
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--warning);
+      background: #090c12;
+      padding: 4px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      letter-spacing: 2px;
+    }
+
+    .countdown-text h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .countdown-text p {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .btn-skip {
+      background: #272f42;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-skip:hover {
+      background: #353f58;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1.3fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 1.25rem;
+      background: #0c0f16;
+      padding: 4px;
+      border-radius: 8px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--card-bg);
+      color: var(--text);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      background: #0c0f16;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 0.92rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--primary);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    .delay-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .help-text {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.2s;
+      margin-top: 1.25rem;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .log-box {
+      background: #07090e;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      height: 320px;
+      overflow-y: auto;
+      padding: 12px 14px;
+      font-family: monospace;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      line-height: 1.5;
+    }
+
+    .log-entry {
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
+
+    .log-entry.success { color: var(--success); }
+    .log-entry.error { color: var(--danger); }
+    .log-entry.warning { color: var(--warning); }
+
+    .table-container {
+      margin-top: 1.5rem;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .badge-status {
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .badge-success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+    .badge-failed { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    .badge-pending { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+
+    .info-banner {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 1rem;
+      font-size: 0.82rem;
+      color: #bae6fd;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="brand-badge">#22</div>
+        <div>
+          <h1>Bot Vote Pawai Nusantara</h1>
+          <p>Kementerian Pertanian (Mobil Hias #22) • Dilengkapi Auto Delay & Cooldown</p>
+        </div>
+      </div>
+      <div class="header-badges">
+        <div class="queue-badge" id="queueBadge">Antrean: 0</div>
+        <div class="status-badge" id="systemStatus">
+          <span>● Server Siap</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Real-time Countdown Banner -->
+    <div class="countdown-banner" id="countdownBanner">
+      <div class="countdown-info">
+        <div class="timer-display" id="timerDisplay">05:00</div>
+        <div class="countdown-text">
+          <h3 id="countdownReason">Jeda Tunggu Antar Vote</h3>
+          <p id="countdownSub">Menghindari deteksi rate limit server pawainusantara.</p>
+        </div>
+      </div>
+      <button class="btn-skip" onclick="skipDelay()">⏩ Lewati Jeda</button>
+    </div>
+
+    <div class="grid">
+      <!-- Input Panel -->
+      <div class="card">
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('single')">Vote Tunggal</button>
+          <button class="tab-btn" onclick="switchTab('batch')">Vote Antrean (Banyak)</button>
+        </div>
+
+        <div class="info-banner">
+          ⏱️ <strong>Proteksi Rate Limit:</strong> Server membatasi percobaan jika terlalu cepat (cooldown 1 menit). Sistem otomatis mendeteksi pesan server dan menghitung mundur jeda antar vote untuk mencegah pemblokiran.
+        </div>
+
+        <!-- Single Vote Form -->
+        <div id="singleTab">
+          <form id="singleForm" onsubmit="handleSingleVote(event)">
+            <div class="form-group">
+              <label for="carSelect">Pilihan Mobil Hias</label>
+              <select id="carSelect">
+                <option value="mobil-22" selected>Mobil #22 - KEMENTERIAN PERTANIAN</option>
+                <option value="mobil-01">Mobil #01</option>
+                <option value="mobil-02">Mobil #02</option>
+                <option value="mobil-03">Mobil #03</option>
+                <option value="mobil-21">Mobil #21</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="voterName">Nama Lengkap (voter_name)</label>
+              <input type="text" id="voterName" placeholder="Contoh: Budi Santoso" required autocomplete="off">
+            </div>
+
+            <div class="form-group">
+              <label for="voterPhone">Nomor Handphone (voter_phone)</label>
+              <input type="tel" id="voterPhone" placeholder="Contoh: 081234567890" required autocomplete="off">
+              <div class="help-text">Satu nomor hanya dapat memberikan satu suara.</div>
+            </div>
+
+            <div class="form-group">
+              <label for="delaySelect">Jeda Waktu Antar Vote</label>
+              <select id="delaySelect">
+                <option value="6" selected>5 - 8 Detik (Otomatis / Default)</option>
+                <option value="10">10 Detik</option>
+                <option value="30">30 Detik</option>
+                <option value="60">1 Menit (60 detik)</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn-submit" id="btnSubmitSingle">
+              <span>🚀 Buka Browser & Isi Otomatis</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Batch Vote Form -->
+        <div id="batchTab" style="display: none;">
+          <form id="batchForm" onsubmit="handleBatchVote(event)">
+            <div class="form-group">
+              <label for="batchInput">Daftar Pemilih (Format: Nama, NoHP per baris)</label>
+              <textarea id="batchInput" placeholder="Budi Santoso, 081234567890&#10;Siti Rahma, 085712345678&#10;Agus Wijaya, 082198765432"></textarea>
+              <div class="help-text">Satu baris = satu suara. Pisahkan dengan tanda koma (,).</div>
+            </div>
+
+            <div class="form-group">
+              <label for="batchDelaySelect">Jeda Waktu Antar Vote di Antrean</label>
+              <select id="batchDelaySelect">
+                <option value="6" selected>5 - 8 Detik (Otomatis / Default)</option>
+                <option value="10">10 Detik</option>
+                <option value="30">30 Detik</option>
+                <option value="60">1 Menit (60 detik)</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn-submit" id="btnSubmitBatch">
+              <span>⚡ Jalankan Antrean Vote</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Live Monitoring Panel -->
+      <div class="card">
+        <div class="card-title">
+          <span>📡 Live Activity Log</span>
+        </div>
+        <div class="log-box" id="logBox">
+          <div class="log-entry">[Sistem] Siap menerima antrean voting dengan fitur proteksi jeda waktu.</div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Waktu</th>
+                <th>Nama</th>
+                <th>No. HP</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="historyTable">
+              <tr>
+                <td colspan="4" style="text-align: center; color: var(--text-muted);">Belum ada riwayat voting.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (tab === 'single') {
+        document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+        document.getElementById('singleTab').style.display = 'block';
+        document.getElementById('batchTab').style.display = 'none';
+      } else {
+        document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+        document.getElementById('singleTab').style.display = 'none';
+        document.getElementById('batchTab').style.display = 'block';
+      }
+    }
+
+    function appendLog(msg, type = '') {
+      const box = document.getElementById('logBox');
+      const div = document.createElement('div');
+      div.className = `log-entry ${type}`;
+      div.textContent = msg;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function addHistoryRow(name, phone, status, message) {
+      const tbody = document.getElementById('historyTable');
+      if (tbody.children.length === 1 && tbody.children[0].children.length === 1) {
+        tbody.innerHTML = '';
+      }
+      const time = new Date().toLocaleTimeString('id-ID');
+      const tr = document.createElement('tr');
+      const badgeClass = status === 'success' ? 'badge-success' : 'badge-failed';
+      const statusText = status === 'success' ? 'Sukses' : 'Gagal / Terkena Limit';
+
+      tr.innerHTML = `
+        <td>${time}</td>
+        <td><strong>${name}</strong></td>
+        <td>${phone}</td>
+        <td><span class="badge-status ${badgeClass}" title="${message}">${statusText}</span></td>
+      `;
+      tbody.prepend(tr);
+    }
+
+    async function skipDelay() {
+      try {
+        await fetch('/api/skip-delay', { method: 'POST' });
+        appendLog('⏩ Mengirim perintah lewati jeda...', 'warning');
+      } catch (e) {}
+    }
+
+    // Connect SSE for streaming logs & countdown
+    const eventSource = new EventSource('/api/events');
+    eventSource.onmessage = function(e) {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'log') {
+          appendLog(data.message, data.logType || '');
+        } else if (data.type === 'result') {
+          addHistoryRow(data.name, data.phone, data.success ? 'success' : 'failed', data.message);
+        } else if (data.type === 'queue_update') {
+          document.getElementById('queueBadge').textContent = `Antrean: ${data.remaining}`;
+        } else if (data.type === 'countdown') {
+          const banner = document.getElementById('countdownBanner');
+          banner.style.display = 'flex';
+          document.getElementById('timerDisplay').textContent = data.timeFormatted;
+          document.getElementById('countdownReason').textContent = data.reason || 'Jeda Terjadwal Antar Vote';
+        } else if (data.type === 'countdown_end') {
+          document.getElementById('countdownBanner').style.display = 'none';
+        } else if (data.type === 'init') {
+          if (data.delaySeconds) {
+            document.getElementById('delaySelect').value = String(data.delaySeconds);
+            document.getElementById('batchDelaySelect').value = String(data.delaySeconds);
+          }
+          document.getElementById('queueBadge').textContent = `Antrean: ${data.queueRemaining || 0}`;
+        }
+      } catch (err) {}
+    };
+
+    async function handleSingleVote(e) {
+      e.preventDefault();
+      const name = document.getElementById('voterName').value.trim();
+      const phone = document.getElementById('voterPhone').value.trim();
+      const carSlug = document.getElementById('carSelect').value;
+      const delaySeconds = parseInt(document.getElementById('delaySelect').value, 10);
+      const btn = document.getElementById('btnSubmitSingle');
+
+      if (!name || !phone) return alert('Nama dan No. HP wajib diisi!');
+
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Menjalankan Bot...';
+
+      try {
+        const res = await fetch('/api/vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, phone, carSlug, delaySeconds })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('voterName').value = '';
+          document.getElementById('voterPhone').value = '';
+        }
+      } catch (err) {
+        appendLog(`[Error] Gagal request: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀 Buka Browser & Isi Otomatis</span>';
+      }
+    }
+
+    async function handleBatchVote(e) {
+      e.preventDefault();
+      const raw = document.getElementById('batchInput').value.trim();
+      const delaySeconds = parseInt(document.getElementById('batchDelaySelect').value, 10);
+      if (!raw) return alert('Masukkan daftar pemilih terlebih dahulu!');
+
+      const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+      const voters = [];
+      for (const line of lines) {
+        const parts = line.split(/[,;\t]/);
+        if (parts.length >= 2) {
+          voters.push({ name: parts[0].trim(), phone: parts[1].trim(), carSlug: 'mobil-22' });
+        }
+      }
+
+      if (voters.length === 0) {
+        return alert('Format tidak sesuai. Gunakan: Nama, NomorHP per baris.');
+      }
+
+      const btn = document.getElementById('btnSubmitBatch');
+      btn.disabled = true;
+      btn.innerHTML = `⏳ Memproses Antrean (${voters.length} data)...`;
+
+      try {
+        const res = await fetch('/api/vote-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voters, delaySeconds })
+        });
+        const data = await res.json();
+        appendLog(`[Antrean] ${voters.length} pemilih berhasil dimasukkan ke antrean dengan jeda ${delaySeconds} detik.`, 'success');
+      } catch (err) {
+        appendLog(`[Error] Gagal mengirim antrean: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡ Jalankan Antrean Vote</span>';
+      }
+    }
+  </script>
+</body>
+</html>

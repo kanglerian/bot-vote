@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  bot-vote:
+    build: .
+    container_name: bot-vote-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - HEADLESS=true
+      - PORT=3000
+    shm_size: '2gb'
