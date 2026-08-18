@@ -103,6 +103,85 @@ async function findChromePath() {
 }
 
 /**
+ * Meluncurkan browser dengan strategi fallback otomatis
+ */
+async function launchBrowser(runHeadless, log) {
+  const isWin = process.platform === 'win32';
+  const chromePath = await findChromePath();
+
+  const commonArgs = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-blink-features=AutomationControlled',
+    '--window-size=1280,900'
+  ];
+
+  if (!isWin) {
+    commonArgs.push('--disable-dev-shm-usage', '--disable-gpu');
+  }
+
+  const strategies = [];
+
+  // 1. Coba path yang terdeteksi
+  if (chromePath) {
+    strategies.push({
+      name: `Chrome (${chromePath})`,
+      options: {
+        executablePath: chromePath,
+        headless: runHeadless,
+        args: commonArgs
+      }
+    });
+  }
+
+  // 2. Coba default Puppeteer bundled browser
+  strategies.push({
+    name: 'Puppeteer Bundled Browser',
+    options: {
+      headless: runHeadless,
+      args: commonArgs
+    }
+  });
+
+  // 3. Coba system channels di Windows/Mac
+  if (isWin || process.platform === 'darwin') {
+    strategies.push({
+      name: 'System Google Chrome',
+      options: {
+        channel: 'chrome',
+        headless: runHeadless,
+        args: commonArgs
+      }
+    });
+
+    if (isWin) {
+      strategies.push({
+        name: 'System Microsoft Edge',
+        options: {
+          channel: 'msedge',
+          headless: runHeadless,
+          args: commonArgs
+        }
+      });
+    }
+  }
+
+  let lastError = null;
+  for (const strategy of strategies) {
+    try {
+      log(`Membuka browser via [${strategy.name}] (Headless: ${runHeadless})...`);
+      const browser = await puppeteer.launch(strategy.options);
+      log(`✅ Browser berhasil dibuka: ${strategy.name}`);
+      return browser;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('Gagal meluncurkan browser Google Chrome / Chromium.');
+}
+
+/**
  * Ekstraksi estimasi waktu tunggu dari teks error
  */
 function parseWaitSeconds(text, defaultSeconds = 10) {
@@ -138,7 +217,6 @@ async function executeVote({
   let browser;
   let rateLimitDetected = false;
   let retrySeconds = 10;
-  let tempProfileDir = null;
 
   // Penentuan mode Headless:
   // Di Windows / Mac / Desktop: DEFAULT FALSE (pasti muncul di layar!)
@@ -154,63 +232,8 @@ async function executeVote({
     runHeadless = false;
   }
 
-  const chromePath = await findChromePath();
-  if (chromePath) {
-    log(`Browser terdeteksi: ${chromePath}`);
-  } else {
-    log('Mencari browser bawaan sistem (Chrome / Edge)...');
-  }
-
-  const isWin = process.platform === 'win32';
-
-  // Buat folder profil sementara unik agar Windows TIDAK menempel ke Chrome yang sudah terbuka di background
   try {
-    tempProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pptr_vote_'));
-  } catch (e) {}
-
-  // Argumen browser khusus untuk Windows vs Linux
-  const browserArgs = isWin
-    ? [
-        '--no-first-run',
-        '--no-default-browser-check',
-        '--start-maximized',
-        '--window-position=0,0',
-        '--window-size=1280,900'
-      ]
-    : [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-gpu',
-        '--window-size=1280,900'
-      ];
-
-  const launchOptions = {
-    headless: runHeadless,
-    defaultViewport: null,
-    userDataDir: tempProfileDir || undefined,
-    args: browserArgs
-  };
-
-  if (chromePath) {
-    launchOptions.executablePath = chromePath;
-  } else if (isWin) {
-    launchOptions.channel = 'chrome';
-  }
-
-  try {
-    try {
-      browser = await puppeteer.launch(launchOptions);
-    } catch (launchErr) {
-      if (isWin) {
-        log('Mencoba membuka Microsoft Edge...');
-        delete launchOptions.executablePath;
-        launchOptions.channel = 'msedge';
-        browser = await puppeteer.launch(launchOptions);
-      } else {
-        throw launchErr;
-      }
-    }
+    browser = await launchBrowser(runHeadless, log);
 
     const pages = await browser.pages();
     const page = pages.length > 0 ? pages[0] : await browser.newPage();
@@ -251,7 +274,7 @@ async function executeVote({
     });
 
     const targetUrl = `https://pawainusantara.vercel.app/${carSlug}`;
-    log(`Membuka jendela browser baru: ${targetUrl}`);
+    log(`Membuka halaman target: ${targetUrl}`);
 
     await page.goto(targetUrl, {
       waitUntil: 'networkidle2',
@@ -292,8 +315,8 @@ async function executeVote({
     log('Mengisi Nomor Handphone...');
     await page.type('input[name="voter_phone"]', phone, { delay: 40 });
 
-    log('Jendela browser sudah aktif di layar monitor.');
-    log('💡 Silakan klik centang "Verify you are human" di layar...');
+    log('Jendela browser aktif di layar.');
+    log('💡 Silakan klik centang "Verify you are human" di layar browser...');
 
     // Polling status tombol dan token Turnstile
     const maxWaitSeconds = 45;
@@ -449,12 +472,6 @@ async function executeVote({
     if (browser) {
       await new Promise(r => setTimeout(r, 1000));
       await browser.close();
-    }
-    // Hapus folder temp profile setelah selesai
-    if (tempProfileDir && fs.existsSync(tempProfileDir)) {
-      try {
-        fs.rmSync(tempProfileDir, { recursive: true, force: true });
-      } catch (e) {}
     }
   }
 }
