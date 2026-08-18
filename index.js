@@ -102,7 +102,7 @@ async function processQueue() {
       }
     });
 
-    if (result.success) {
+    if (result.success || result.alreadyVoted) {
       successfulPhones.add(normPhone);
     }
     queuedPhones.delete(normPhone);
@@ -112,9 +112,18 @@ async function processQueue() {
       name: item.name,
       phone: item.phone,
       success: result.success,
+      alreadyVoted: result.alreadyVoted || false,
       isRateLimited: result.isRateLimited || false,
       message: result.message
     });
+
+    if (result.alreadyVoted) {
+      broadcast({
+        type: 'log',
+        message: `⏭️ [SKIP] ${item.name} (${item.phone}) dilewati karena status: "${result.message}". Langsung lanjut...`,
+        logType: 'warning'
+      });
+    }
 
     // Jika terjadi rate limit dari server, kembalikan pemilih ke antrean awal jika gagal
     if (result.isRateLimited) {
@@ -240,6 +249,25 @@ app.post('/api/vote-batch', async (req, res) => {
 app.post('/api/skip-delay', (req, res) => {
   skipCurrentDelay = true;
   res.json({ success: true, message: 'Jeda dilewati' });
+});
+
+// Reset total antrean, cache nomor HP, dan history
+app.post('/api/reset', (req, res) => {
+  queue.length = 0;
+  successfulPhones.clear();
+  queuedPhones.clear();
+  skipCurrentDelay = true;
+  currentCountdown = 0;
+
+  broadcast({ type: 'reset_all' });
+  broadcast({ type: 'queue_update', remaining: 0 });
+  broadcast({
+    type: 'log',
+    message: '🧹 [RESET TOTAL] Semua antrean, data cache nomor HP, dan riwayat telah dibersihkan!',
+    logType: 'warning'
+  });
+
+  res.json({ success: true, message: 'Semua cache dan antrean telah dibersihkan ulang dari awal.' });
 });
 
 // Update delay config

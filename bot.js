@@ -1,6 +1,8 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
 puppeteer.use(StealthPlugin());
 
 /**
@@ -16,11 +18,25 @@ function findChromePath() {
     '/usr/bin/chromium',
     '/usr/bin/chromium-browser',
     '/snap/bin/chromium',
-    '/usr/bin/chromium/chrome'
+    '/usr/bin/chromium/chrome',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'
   ];
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) return p;
   }
+
+  // Cek via `which` command
+  try {
+    const whichChrome = execSync('which google-chrome || which google-chrome-stable || which chromium || which chromium-browser 2>/dev/null')
+      .toString()
+      .trim();
+    if (whichChrome && fs.existsSync(whichChrome)) {
+      return whichChrome;
+    }
+  } catch (e) {}
+
   return undefined;
 }
 
@@ -86,6 +102,8 @@ async function executeVote({
 
     if (chromePath) {
       launchOptions.executablePath = chromePath;
+    } else {
+      launchOptions.channel = 'chrome';
     }
 
     browser = await puppeteer.launch(launchOptions);
@@ -93,6 +111,17 @@ async function executeVote({
     const pages = await browser.pages();
     const page = pages.length > 0 ? pages[0] : await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
+
+    // Hapus total semua cookies, cache, dan localStorage sebelum membuka halaman
+    try {
+      const client = await page.target().createCDPSession();
+      await client.send('Network.clearBrowserCookies');
+      await client.send('Network.clearBrowserCache');
+      await client.send('Storage.clearDataForOrigin', {
+        origin: 'https://pawainusantara.vercel.app',
+        storageTypes: 'all'
+      });
+    } catch (e) {}
 
     // Set User Agent realistis
     await page.setUserAgent('Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
@@ -124,6 +153,25 @@ async function executeVote({
     log('Menunggu form voting dimuat...');
     await page.waitForSelector('input[name="voter_name"]', { timeout: 15000 });
     await page.waitForSelector('input[name="voter_phone"]', { timeout: 15000 });
+
+    // Cek awal jika halaman sudah terkunci "Sudah memberikan suara"
+    const initialCheck = await page.evaluate(() => {
+      const btn = document.querySelector('button[type="submit"], form button.primary');
+      const text = btn ? btn.innerText.trim() : '';
+      if (text.includes('Sudah memberikan suara') || text.includes('Voting Ditutup')) {
+        return text;
+      }
+      return null;
+    });
+
+    if (initialCheck) {
+      log(`⏭️ [SKIP INSTAN] Halaman terdeteksi "${initialCheck}". Langsung melewati pemilih ini...`);
+      return {
+        success: false,
+        alreadyVoted: true,
+        message: initialCheck
+      };
+    }
 
     // Bersihkan nilai input jika ada
     await page.click('input[name="voter_name"]', { clickCount: 3 });
@@ -164,6 +212,22 @@ async function executeVote({
       if (state.hasSuccess) {
         log(`🎉 Berhasil! ${state.successText}`);
         return { success: true, message: state.successText };
+      }
+
+      // Cek apakah tombol atau halaman menunjukkan "Sudah memberikan suara" (langsung skip instan)
+      if (
+        state.btnText.includes('Sudah memberikan suara') || 
+        state.btnText.includes('Nomor sudah pernah') ||
+        state.errorText.includes('sudah pernah') ||
+        state.errorText.includes('Sudah memberikan')
+      ) {
+        const msg = state.btnText || state.errorText || 'Sudah memberikan suara';
+        log(`⏭️ [SKIP INSTAN] Terdeteksi status "${msg}". Langsung melewati pemilih ini...`);
+        return {
+          success: false,
+          alreadyVoted: true,
+          message: msg
+        };
       }
 
       // Cek apakah tombol menunjukkan "Mohon tunggu" (sedang dalam masa cooldown)

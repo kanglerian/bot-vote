@@ -109,6 +109,23 @@
       border: 1px solid rgba(56, 189, 248, 0.25);
     }
 
+    .btn-reset {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-reset:hover {
+      background: rgba(239, 68, 68, 0.35);
+      color: #ffffff;
+    }
+
     /* Countdown Banner */
     .countdown-banner {
       display: none;
@@ -380,6 +397,7 @@
         </div>
       </div>
       <div class="header-badges">
+        <button class="btn-reset" onclick="resetAll()" title="Bersihkan antrean dan riwayat dari awal">🧹 Reset Total</button>
         <div class="queue-badge" id="queueBadge">Antrean: 0</div>
         <div class="status-badge" id="systemStatus">
           <span>● Server Siap</span>
@@ -538,8 +556,15 @@
       }
       const time = new Date().toLocaleTimeString('id-ID');
       const tr = document.createElement('tr');
-      const badgeClass = status === 'success' ? 'badge-success' : 'badge-failed';
-      const statusText = status === 'success' ? 'Sukses' : 'Gagal / Terkena Limit';
+      let badgeClass = 'badge-failed';
+      let statusText = 'Gagal';
+      if (status === 'success') {
+        badgeClass = 'badge-success';
+        statusText = 'Sukses';
+      } else if (status === 'already_voted' || (message && message.toLowerCase().includes('sudah'))) {
+        badgeClass = 'badge-pending';
+        statusText = 'Sudah Vote (Skip)';
+      }
 
       tr.innerHTML = `
         <td>${time}</td>
@@ -548,6 +573,15 @@
         <td><span class="badge-status ${badgeClass}" title="${message}">${statusText}</span></td>
       `;
       tbody.prepend(tr);
+    }
+
+    async function resetAll() {
+      if (!confirm('Apakah Anda yakin ingin mereset dan menghapus semua antrean, data cache, dan riwayat dari awal?')) return;
+      try {
+        await fetch('/api/reset', { method: 'POST' });
+      } catch (e) {
+        alert('Gagal mereset: ' + e.message);
+      }
     }
 
     async function skipDelay() {
@@ -565,7 +599,13 @@
         if (data.type === 'log') {
           appendLog(data.message, data.logType || '');
         } else if (data.type === 'result') {
-          addHistoryRow(data.name, data.phone, data.success ? 'success' : 'failed', data.message);
+          const statusType = data.success ? 'success' : (data.alreadyVoted ? 'already_voted' : 'failed');
+          addHistoryRow(data.name, data.phone, statusType, data.message);
+        } else if (data.type === 'reset_all') {
+          document.getElementById('historyTable').innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Belum ada riwayat voting.</td></tr>';
+          document.getElementById('logBox').innerHTML = '<div class="log-entry">[Sistem] Semua cache, antrean, dan riwayat telah dibersihkan ulang dari awal.</div>';
+          document.getElementById('countdownBanner').style.display = 'none';
+          document.getElementById('queueBadge').textContent = 'Antrean: 0';
         } else if (data.type === 'queue_update') {
           document.getElementById('queueBadge').textContent = `Antrean: ${data.remaining}`;
         } else if (data.type === 'countdown') {
